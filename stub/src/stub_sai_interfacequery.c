@@ -171,6 +171,8 @@ sai_status_t sai_api_uninitialize(void)
     memset(&g_services, 0, sizeof(g_services));
     g_initialized = false;
 
+    db_lag_unitialize();
+
     return SAI_STATUS_SUCCESS;
 }
 

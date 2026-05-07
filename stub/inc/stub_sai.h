@@ -235,6 +235,8 @@ sai_status_t stub_fill_vlanlist(sai_vlan_id_t *data, uint32_t count, sai_vlan_li
 
 void utils_log(const sai_log_level_t severity, const char *module_name, const char *p_str, ...);
 
+void db_lag_unitialize();
+
 #define QUOTEME_(x) #x                        /* add "" to x */
 #define QUOTEME(x)  QUOTEME_(x)
 
