@@ -525,16 +525,18 @@ void test_lag_member_capacity(sai_lag_api_t* lag_api) {
 }
 
 void test_set_lag_member_attribute(sai_lag_api_t* lag_api) {
-    // ToDo: fix it
+    printf("\n");
+    printf("Test set lag member attribute\n");
+    printf("\n");
 
-    // printf("\n");
-    // printf("Test set lag member attribute\n");
-    // printf("\n");
+    sai_status_t status = 0;
 
-    // sai_status_t status = 0;
+    sai_attribute_t attr;  
+    attr.id = SAI_LAG_MEMBER_ATTR_LAG_ID;
+    attr.value.oid = 321;
 
-    // status = lag_api->set_lag_attribute(12345, NULL);
-    // assert(status == SAI_STATUS_NOT_SUPPORTED);
+    status = lag_api->set_lag_attribute(123, &attr);
+    assert(SAI_STATUS_IS_INVALID_ATTRIBUTE(1));
 }
 
 void test_get_lag_member_attribute(sai_lag_api_t* lag_api) {
