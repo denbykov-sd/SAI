@@ -13,11 +13,27 @@ static const sai_attribute_entry_t lag_attribs[] = {
       "", SAI_ATTR_VAL_TYPE_UNDETERMINED }
 };
 
+static sai_status_t stub_lag_attrib_get(
+    _In_ const sai_object_key_t   *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t                  attr_index,
+    _Inout_ vendor_cache_t        *cache,
+    void                          *arg
+);
+
+static sai_status_t stub_lag_member_attrib_get(
+    _In_ const sai_object_key_t   *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t                  attr_index,
+    _Inout_ vendor_cache_t        *cache,
+    void                          *arg
+);
+
 static const sai_vendor_attribute_entry_t lag_vendor_attribs[] = {
     { SAI_LAG_ATTR_PORT_LIST,
       { false, false, false, true },
       { false, false, false, true },
-      NULL, NULL,
+      stub_lag_attrib_get, (void*)SAI_LAG_ATTR_PORT_LIST,
       NULL, NULL }
 };
 
@@ -35,12 +51,12 @@ static const sai_vendor_attribute_entry_t lag_member_vendor_attribs[] = {
     { SAI_LAG_MEMBER_ATTR_LAG_ID,
       { true, true, false, true },
       { true, true, false, true },
-      NULL, NULL,
+      stub_lag_member_attrib_get, (void*)SAI_LAG_MEMBER_ATTR_LAG_ID,
       NULL, NULL },
     { SAI_LAG_MEMBER_ATTR_PORT_ID,
       { true, true, false, true },
       { true, true, false, true },
-      NULL, NULL,
+      stub_lag_member_attrib_get, (void*)SAI_LAG_MEMBER_ATTR_PORT_ID,
       NULL, NULL }
 };
 
@@ -150,37 +166,53 @@ sai_status_t stub_remove_lag(
     return SAI_STATUS_SUCCESS;
 }
 
-sai_status_t stub_set_lag_attribute(
-    _In_ sai_object_id_t  lag_id,
-    _In_ const sai_attribute_t *attr)
+static void lag_key_to_str(
+    _In_ sai_object_id_t lag_id,
+    _Out_ char *key_str)
 {
-    printf("SET LAG ATTRIBUTE FOR LAG: 0x%010lX\n", lag_id);
-    return SAI_STATUS_NOT_SUPPORTED;
+    uint32_t id;
+
+    if (SAI_STATUS_SUCCESS != stub_object_to_type(lag_id, SAI_OBJECT_TYPE_LAG, &id)) {
+        snprintf(key_str, MAX_KEY_STR_LEN, "invalid lag");
+    } else {
+        snprintf(key_str, MAX_KEY_STR_LEN, "lag %u", id);
+    }
 }
 
-sai_status_t stub_get_lag_attribute(
+sai_status_t stub_set_lag_attribute(
     _In_ sai_object_id_t lag_id,
-    _In_ uint32_t attr_count,
-    _Inout_ sai_attribute_t *attr_list)
+    _In_ const sai_attribute_t *attr)
 {
-    assert(attr_list != NULL);
+    const sai_object_key_t key = { .object_id = lag_id };
+    char                   key_str[MAX_KEY_STR_LEN];
 
-    printf("GET LAG ATTRIBUTE FOR LAG: 0x%010lX\n", lag_id);
+    STUB_LOG_ENTER();
 
-    sai_status_t status = check_attribs_metadata(
-        attr_count,
-        attr_list,
+    lag_key_to_str(lag_id, key_str);
+    return sai_set_attribute(
+        &key,
+        key_str,
         lag_attribs,
         lag_vendor_attribs,
-        SAI_OPERATION_GET);
-    if (status != SAI_STATUS_SUCCESS) {
-        printf("Attribute check failed, ec: 0x%016X\n", status);
-        return status;
-    }
+        attr);
+}
+
+sai_status_t stub_lag_attrib_get(
+    _In_ const sai_object_key_t   *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t                  attr_index,
+    _Inout_ vendor_cache_t        *cache,
+    void                          *arg) 
+{
+    int64_t attr_type = (int64_t)arg;
+    
+    assert((SAI_LAG_ATTR_PORT_LIST == attr_type));
+
+    sai_status_t status = 0;
 
     uint32_t element_id;
     status = stub_object_to_type(
-        lag_id,
+        key->object_id,
         SAI_OBJECT_TYPE_LAG,
         &element_id
     );
@@ -191,11 +223,11 @@ sai_status_t stub_get_lag_attribute(
     lag_t* lag_entry = &LAG_DB.lags[element_id];
 
     if (!lag_entry->taken) {
-        printf("LAG(0x%010lX) does not exist\n", lag_id);
+        printf("LAG(0x%010lX) does not exist\n", key->object_id);
         return SAI_STATUS_INVALID_OBJECT_ID;
     }
 
-    sai_object_list_t* list = &attr_list->value.objlist;
+    sai_object_list_t* list = &value->objlist;
 
     for (int idx = 0; idx < LAG_MEMBER_COUNT; idx++) {
         if (lag_entry->members[idx].lag != 0) {
@@ -203,6 +235,28 @@ sai_status_t stub_get_lag_attribute(
             list->count += 1;
         }
     }
+
+    return status;
+}
+
+sai_status_t stub_get_lag_attribute(
+    _In_ sai_object_id_t lag_id,
+    _In_ uint32_t attr_count,
+    _Inout_ sai_attribute_t *attr_list)
+{
+    const sai_object_key_t key = { .object_id = lag_id };
+    char                   key_str[MAX_KEY_STR_LEN];
+
+    STUB_LOG_ENTER();
+
+    lag_key_to_str(lag_id, key_str);
+    return sai_get_attributes(
+        &key,
+        key_str,
+        lag_attribs,
+        lag_vendor_attribs,
+        attr_count,
+        attr_list);
 
     return SAI_STATUS_SUCCESS;
 }
@@ -396,38 +450,59 @@ sai_status_t stub_remove_lag_member(
     return SAI_STATUS_SUCCESS;
 }
 
-sai_status_t stub_set_lag_member_attribute(
-    _In_ sai_object_id_t  lag_member_id,
-    _In_ const sai_attribute_t *attr)
+static void lag_member_key_to_str(
+    _In_ sai_object_id_t lag_member_id,
+    _Out_ char *key_str)
 {
-    printf("SET LAG MEMBER ATTRIBUTE FOR LAG: 0x%010lX\n", lag_member_id);
-    return SAI_STATUS_NOT_SUPPORTED;
+    uint32_t id;
+
+    if (SAI_STATUS_SUCCESS != stub_object_to_type(
+        lag_member_id, SAI_OBJECT_TYPE_LAG_MEMBER, &id)) {
+        snprintf(key_str, MAX_KEY_STR_LEN, "invalid member lag");
+    } else {
+        snprintf(key_str, MAX_KEY_STR_LEN, "lag member %u", id);
+    }
 }
 
-sai_status_t stub_get_lag_member_attribute(
+sai_status_t stub_set_lag_member_attribute(
     _In_ sai_object_id_t lag_member_id,
-    _In_ uint32_t attr_count,
-    _Inout_ sai_attribute_t *attr_list)
+    _In_ const sai_attribute_t *attr)
 {
-    assert(attr_list != NULL);
+    const sai_object_key_t key = { .object_id = lag_member_id };
+    char                   key_str[MAX_KEY_STR_LEN];
 
-    printf("GET LAG MEMBER ATTRIBUTE FOR LAG: 0x%010lX\n", lag_member_id);
+    STUB_LOG_ENTER();
 
-    sai_status_t status = check_attribs_metadata(
-        attr_count,
-        attr_list,
+    lag_member_key_to_str(lag_member_id, key_str);
+    return sai_set_attribute(
+        &key,
+        key_str,
         lag_member_attribs,
         lag_member_vendor_attribs,
-        SAI_OPERATION_GET);
-    if (status != SAI_STATUS_SUCCESS) {
-        printf("Attribute check failed, ec: 0x%016X\n", status);
-        return status;
-    }
+        attr);
+}
+
+sai_status_t stub_lag_member_attrib_get(
+    _In_ const sai_object_key_t   *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t                  attr_index,
+    _Inout_ vendor_cache_t        *cache,
+    void                          *arg
+)
+{
+    int64_t attr_type = (int64_t)arg;
+    
+    assert(
+        (SAI_LAG_MEMBER_ATTR_LAG_ID == attr_type) ||
+        (SAI_LAG_MEMBER_ATTR_PORT_ID == attr_type)
+    );
+
+    sai_status_t status = 0;
 
     uint32_t lag_member_element_id = 0;
 
     status = stub_object_to_type(
-        lag_member_id,
+        key->object_id,
         SAI_OBJECT_TYPE_LAG_MEMBER,
         &lag_member_element_id);
     if (status != SAI_STATUS_SUCCESS) {
@@ -438,27 +513,43 @@ sai_status_t stub_get_lag_member_attribute(
     }
 
     if (lag_member_element_id >= LAG_MEMBER_COUNT) {
-        printf("Bad lag member(0x%010lX)\n", lag_member_id);
+        printf("Bad lag member(0x%010lX)\n", key->object_id);
         return SAI_STATUS_INVALID_OBJECT_ID;
     }
 
     lag_t* lag_entry = LAG_DB.member_lag[lag_member_element_id];
     lag_member_t* entry = lag_entry->members + lag_member_element_id;
 
-    for (uint32_t idx = 0; idx < attr_count; idx++) {
-        sai_attribute_t* attr = attr_list + idx;
-
-        switch (attr->id) {
-            case SAI_LAG_MEMBER_ATTR_LAG_ID:
-                attr->value.oid = entry->lag;
-                break;
-            case SAI_LAG_MEMBER_ATTR_PORT_ID:
-                attr->value.oid = entry->port;
-                break;
-            default:
-                return SAI_STATUS_NOT_IMPLEMENTED;
-        }
+    switch (attr_type) {
+        case SAI_LAG_MEMBER_ATTR_LAG_ID:
+            value->oid = entry->lag;
+            break;
+        case SAI_LAG_MEMBER_ATTR_PORT_ID:
+            value->oid = entry->port;
+            break;
     }
+
+    return SAI_STATUS_SUCCESS;
+}
+
+sai_status_t stub_get_lag_member_attribute(
+    _In_ sai_object_id_t lag_member_id,
+    _In_ uint32_t attr_count,
+    _Inout_ sai_attribute_t *attr_list)
+{
+    const sai_object_key_t key = { .object_id = lag_member_id };
+    char                   key_str[MAX_KEY_STR_LEN];
+
+    STUB_LOG_ENTER();
+
+    lag_member_key_to_str(lag_member_id, key_str);
+    return sai_get_attributes(
+        &key,
+        key_str,
+        lag_member_attribs,
+        lag_member_vendor_attribs,
+        attr_count,
+        attr_list);
 
     return SAI_STATUS_SUCCESS;
 }
