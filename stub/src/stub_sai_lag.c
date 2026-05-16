@@ -90,9 +90,11 @@ void db_lag_unitialize() {
 }
 
 static sai_status_t get_lag_entry(sai_object_id_t lag_id, lag_t** entry) {
+    assert(entry != NULL);
+
     sai_status_t status = 0;
 
-    uint32_t lag_idx;
+    uint32_t lag_idx = 0;
 
     status = stub_object_to_type(
         lag_id,
@@ -102,8 +104,13 @@ static sai_status_t get_lag_entry(sai_object_id_t lag_id, lag_t** entry) {
         return status;
     }
 
-    if (lag_idx >= LAG_MEMBER_COUNT) {
-        printf("Bad lag member(0x%010lX)\n", lag_id);
+    if (lag_idx >= LAG_COUNT) {
+        printf("Bad lag(0x%010lX)\n", lag_id);
+        return SAI_STATUS_INVALID_OBJECT_ID;
+    }
+
+    if (!LAG_DB.lags[lag_idx].taken) {
+        printf("Bad lag(0x%010lX)\n", lag_id);
         return SAI_STATUS_INVALID_OBJECT_ID;
     }
 
@@ -114,9 +121,11 @@ static sai_status_t get_lag_entry(sai_object_id_t lag_id, lag_t** entry) {
 
 static sai_status_t get_lag_member_entry(
     sai_object_id_t lag_member_id, lag_member_t** entry) {
+    assert(entry != NULL);
+
     sai_status_t status = 0;
 
-    uint32_t lag_member_idx;
+    uint32_t lag_member_idx = 0;
 
     status = stub_object_to_type(
         lag_member_id,
@@ -131,6 +140,11 @@ static sai_status_t get_lag_member_entry(
         return SAI_STATUS_INVALID_OBJECT_ID;
     }
 
+    if (!LAG_DB.members[lag_member_idx].taken) {
+        printf("Bad lag member(0x%010lX)\n", lag_member_id);
+        return SAI_STATUS_INVALID_OBJECT_ID;
+    }
+
     *entry = &LAG_DB.members[lag_member_idx];
 
     return status;
@@ -141,6 +155,8 @@ sai_status_t stub_create_lag(
     _In_ uint32_t attr_count,
     _In_ sai_attribute_t *attr_list)
 {
+    assert(lag_id != NULL);
+
     sai_status_t status = 0;
 
     status = check_attribs_metadata(
@@ -213,6 +229,8 @@ static void lag_key_to_str(
     _In_ sai_object_id_t lag_id,
     _Out_ char *key_str)
 {
+    assert(key_str != NULL);
+
     uint32_t id;
 
     if (SAI_STATUS_SUCCESS != stub_object_to_type(lag_id, SAI_OBJECT_TYPE_LAG, &id)) {
@@ -247,13 +265,16 @@ sai_status_t stub_lag_attrib_get(
     _Inout_ vendor_cache_t        *cache,
     void                          *arg) 
 {
+    assert(key != NULL);
+    assert(value != NULL);
+
     int64_t attr_type = (int64_t)arg;
     
     assert((SAI_LAG_ATTR_PORT_LIST == attr_type));
 
     sai_status_t status = 0;
 
-    uint32_t idx;
+    uint32_t idx = 0;
     status = stub_object_to_type(
         key->object_id,
         SAI_OBJECT_TYPE_LAG,
@@ -261,6 +282,11 @@ sai_status_t stub_lag_attrib_get(
     );
     if (status != SAI_STATUS_SUCCESS) {
         return status;
+    }
+
+    if (idx >= LAG_COUNT) {
+        printf("Bad lag(0x%010lX)\n", key->object_id);
+        return SAI_STATUS_INVALID_OBJECT_ID;
     }
 
     lag_t* lag_entry = &LAG_DB.lags[idx];
@@ -279,6 +305,9 @@ sai_status_t stub_lag_attrib_get(
             status = get_lag_member_entry(
                 lag_entry->members[idx],
                 &lag_member_entry);
+            // if status is not successful it means that invariants
+            // are broken and db is corrupted
+            assert(status == SAI_STATUS_SUCCESS);
 
             list->list[list->count] = lag_member_entry->port;
             list->count += 1;
@@ -306,8 +335,6 @@ sai_status_t stub_get_lag_attribute(
         lag_vendor_attribs,
         attr_count,
         attr_list);
-
-    return SAI_STATUS_SUCCESS;
 }
 
 sai_status_t stub_create_lag_member(
@@ -315,7 +342,7 @@ sai_status_t stub_create_lag_member(
     _In_ uint32_t attr_count,
     _In_ sai_attribute_t *attr_list)
 {
-    assert(attr_list != NULL);
+    assert(lag_member_id != NULL);
 
     sai_status_t status = 0;
 
@@ -476,20 +503,16 @@ sai_status_t stub_remove_lag_member(
     }
     
     lag_member_t* lag_member_entry = &LAG_DB.members[lag_member_idx];
+    if (!lag_member_entry->taken) {
+        printf("Lag member(0x%010lX) does not exist\n", lag_member_id);
+        return SAI_STATUS_INVALID_OBJECT_ID;
+    }
 
     lag_t *lag_entry = NULL;
     status = get_lag_entry(lag_member_entry->lag, &lag_entry);
-    if (status != SAI_STATUS_SUCCESS) {
-        printf(
-            "Failed to get lag entry, ec: 0x%016X\n",
-            status);
-        return SAI_STATUS_INVALID_OBJECT_ID;
-    }
-
-    if (lag_member_entry == NULL) {
-        printf("Bad lag member(0x%010lX)\n", lag_member_id);
-        return SAI_STATUS_INVALID_OBJECT_ID;
-    }
+    // if status is not successful it means that invariants
+    // are broken and db is corrupted
+    assert(status == SAI_STATUS_SUCCESS);
 
     sai_object_id_t port_id = lag_member_entry->port;
     uint32_t port_idx = UINT32_MAX;
@@ -516,6 +539,8 @@ static void lag_member_key_to_str(
     _In_ sai_object_id_t lag_member_id,
     _Out_ char *key_str)
 {
+    assert(key_str != NULL);
+
     uint32_t id;
 
     if (SAI_STATUS_SUCCESS != stub_object_to_type(
@@ -552,6 +577,9 @@ sai_status_t stub_lag_member_attrib_get(
     void                          *arg
 )
 {
+    assert(key != NULL);
+    assert(value != NULL);
+
     int64_t attr_type = (int64_t)arg;
     
     assert(
@@ -611,8 +639,6 @@ sai_status_t stub_get_lag_member_attribute(
         lag_member_vendor_attribs,
         attr_count,
         attr_list);
-
-    return SAI_STATUS_SUCCESS;
 }
 
 const sai_lag_api_t lag_api = {

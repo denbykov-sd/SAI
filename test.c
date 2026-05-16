@@ -125,7 +125,7 @@ void test_set_lag_attribute(sai_lag_api_t* lag_api) {
     attr.value.objlist.list = list;
 
     status = lag_api->set_lag_attribute(lag_id, &attr);
-    assert(SAI_STATUS_IS_INVALID_ATTRIBUTE(1));
+    assert(status == SAI_STATUS_INVALID_ATTRIBUTE_0);
 }
 
 int compare_lists(sai_object_list_t* l1, sai_object_list_t* l2, size_t count) {
@@ -276,6 +276,10 @@ void test_get_lag_attribute(sai_lag_api_t* lag_api) {
 
     status = lag_api->get_lag_attribute(
         lag_id, 1, &attr);
+    assert(status == SAI_STATUS_INVALID_OBJECT_ID);
+
+    status = lag_api->get_lag_attribute(
+        0x5000000002, 1, &attr);
     assert(status == SAI_STATUS_INVALID_OBJECT_ID);
 }
 
@@ -536,7 +540,7 @@ void test_set_lag_member_attribute(sai_lag_api_t* lag_api) {
     attr.value.oid = 321;
 
     status = lag_api->set_lag_attribute(123, &attr);
-    assert(SAI_STATUS_IS_INVALID_ATTRIBUTE(1));
+    assert(status == SAI_STATUS_INVALID_ATTRIBUTE_0);
 }
 
 void test_get_lag_member_attribute(sai_lag_api_t* lag_api) {
