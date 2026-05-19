@@ -157,7 +157,7 @@ void test_get_lag_attribute(sai_lag_api_t* lag_api) {
     attr.id = SAI_LAG_ATTR_PORT_LIST;
     
     sai_object_id_t list[16] = {0};
-    attr.value.objlist.count = 0;
+    attr.value.objlist.count = 16;
     attr.value.objlist.list = list;
 
     status = lag_api->get_lag_attribute(
@@ -202,7 +202,7 @@ void test_get_lag_attribute(sai_lag_api_t* lag_api) {
     }
 
     memset(list, 0, sizeof(list));
-    attr.value.objlist.count = 0;
+    attr.value.objlist.count = 16;
     attr.value.objlist.list = list;
 
     status = lag_api->get_lag_attribute(
@@ -222,11 +222,30 @@ void test_get_lag_attribute(sai_lag_api_t* lag_api) {
             &attr.value.objlist, &expected_list, 16) == 0);
     }
 
+    memset(list, 0, sizeof(list));
+    attr.value.objlist.count = 1;
+    attr.value.objlist.list = list;
+
+    status = lag_api->get_lag_attribute(
+        lag_id, 1, &attr);
+    assert(status == SAI_STATUS_SUCCESS);
+
+    {
+        sai_object_id_t expected_memory[16] = {0};
+
+        sai_object_list_t expected_list;
+        expected_list.count = 2;
+        expected_list.list = expected_memory;
+
+        assert(compare_lists(
+            &attr.value.objlist, &expected_list, 16) == 0);
+    }
+
     status = lag_api->remove_lag_member(lag_member_id1);
     assert(status == SAI_STATUS_SUCCESS);
 
     memset(list, 0, sizeof(list));
-    attr.value.objlist.count = 0;
+    attr.value.objlist.count = 16;
     attr.value.objlist.list = list;
 
     status = lag_api->get_lag_attribute(
@@ -662,7 +681,7 @@ void test_happy_pass(sai_lag_api_t* lag_api) {
         attr.id = SAI_LAG_ATTR_PORT_LIST;
         
         sai_object_id_t list[16] = {0};
-        attr.value.objlist.count = 0;
+        attr.value.objlist.count = 16;
         attr.value.objlist.list = list;
 
         status = lag_api->get_lag_attribute(
@@ -686,7 +705,7 @@ void test_happy_pass(sai_lag_api_t* lag_api) {
         attr.id = SAI_LAG_ATTR_PORT_LIST;
         
         sai_object_id_t list[16] = {0};
-        attr.value.objlist.count = 0;
+        attr.value.objlist.count = 16;
         attr.value.objlist.list = list;
 
         status = lag_api->get_lag_attribute(lag2_id, 1, &attr);
@@ -734,7 +753,7 @@ void test_happy_pass(sai_lag_api_t* lag_api) {
         attr.id = SAI_LAG_ATTR_PORT_LIST;
         
         sai_object_id_t list[16] = {0};
-        attr.value.objlist.count = 0;
+        attr.value.objlist.count = 16;
         attr.value.objlist.list = list;
 
         status = lag_api->get_lag_attribute(lag1_id, 1, &attr);
@@ -759,7 +778,7 @@ void test_happy_pass(sai_lag_api_t* lag_api) {
         attr.id = SAI_LAG_ATTR_PORT_LIST;
         
         sai_object_id_t list[16] = {0};
-        attr.value.objlist.count = 0;
+        attr.value.objlist.count = 16;
         attr.value.objlist.list = list;
 
         status = lag_api->get_lag_attribute(lag2_id, 1, &attr);

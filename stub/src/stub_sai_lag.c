@@ -296,7 +296,8 @@ sai_status_t stub_lag_attrib_get(
         return SAI_STATUS_INVALID_OBJECT_ID;
     }
 
-    sai_object_list_t* list = &value->objlist;
+    uint32_t count = 0;
+    sai_object_id_t data[LAG_MEMBER_COUNT];
 
     for (int idx = 0; idx < LAG_MEMBER_COUNT; idx++) {
         if (lag_entry->members[idx] != 0) {
@@ -309,10 +310,14 @@ sai_status_t stub_lag_attrib_get(
             // are broken and db is corrupted
             assert(status == SAI_STATUS_SUCCESS);
 
-            list->list[list->count] = lag_member_entry->port;
-            list->count += 1;
+            data[count] = lag_member_entry->port;
+            count += 1;
         }
     }
+
+    sai_object_list_t* list = &value->objlist;
+
+    stub_fill_objlist(data, count, list);
 
     return status;
 }
@@ -430,9 +435,14 @@ sai_status_t stub_create_lag_member(
     }
 
     for (int idx = 0; idx < LAG_MEMBER_COUNT; idx++) {
-        if (LAG_DB.members[idx].port == port_id) {
+        lag_member_t* entry = &LAG_DB.members[idx];
+
+        if (entry->port == port_id && entry->taken) {
             printf("Port(%d) is already a member of lag\n", port_idx);
             return SAI_STATUS_INVALID_PORT_MEMBER;
+        } else if (entry->port == port_id && !entry->taken) {
+            printf("Lag db corruption detected, shutting down\n");
+            abort();
         }
     }
 
@@ -608,6 +618,11 @@ sai_status_t stub_lag_member_attrib_get(
     }
 
     lag_member_t* entry = &LAG_DB.members[lag_member_idx];
+
+    if (!entry->taken) {
+        printf("Bad lag member(0x%010lX)\n", key->object_id);
+        return SAI_STATUS_INVALID_OBJECT_ID;
+    }
 
     switch (attr_type) {
         case SAI_LAG_MEMBER_ATTR_LAG_ID:
