@@ -19,25 +19,25 @@ static const sai_attribute_entry_t buffer_pool_attribs[] = {
     {
         SAI_BUFFER_POOL_ATTR_SHARED_SIZE, 
         false, false, false, true,
-        "Shared buffer size",
+        "Shared Buffer Size",
         SAI_ATTR_VAL_TYPE_U32 
     },
     {
         SAI_BUFFER_POOL_ATTR_TYPE, 
         true, true, false, true,
-        "Buffer pool type",
+        "Buffer Pool Type",
         SAI_ATTR_VAL_TYPE_S32
     },
     {
         SAI_BUFFER_POOL_ATTR_SIZE, 
         true, true, true, true,
-        "Buffer pool size",
+        "Buffer Pool Size",
         SAI_ATTR_VAL_TYPE_U32
     },
     {
         SAI_BUFFER_POOL_ATTR_TH_MODE, 
         false, true, false, true,
-        "Threshold mode for the buffer pool",
+        "Threshold Mode for the Buffer Pool",
         SAI_ATTR_VAL_TYPE_S32
     },
 
@@ -87,37 +87,37 @@ static const sai_attribute_entry_t buffer_profile_attribs[] = {
     {
         SAI_BUFFER_PROFILE_ATTR_POOL_ID, 
         true, true, true, true,
-        "Buffer pool ID",
+        "Buffer Pool ID",
         SAI_ATTR_VAL_TYPE_OID
     },
     {
         SAI_BUFFER_PROFILE_ATTR_BUFFER_SIZE, 
         true, true, true, true,
-        "Reserved buffer size",
+        "Reserved Buffer Size",
         SAI_ATTR_VAL_TYPE_U32
     },
     {
         SAI_BUFFER_PROFILE_ATTR_SHARED_DYNAMIC_TH, 
         false, true, true, true,
-        "Dynamic buffer threshold",
+        "Dynamic Buffer Threshold",
         SAI_ATTR_VAL_TYPE_S8
     },
     {
         SAI_BUFFER_PROFILE_ATTR_SHARED_STATIC_TH, 
         false, true, true, true,
-        "Static buffer threshold",
+        "Static Buffer Threshold",
         SAI_ATTR_VAL_TYPE_U32
     },
     {
         SAI_BUFFER_PROFILE_ATTR_XOFF_TH, 
         false, true, true, true,
-        "XOFF ingress buffer threshold",
+        "XOFF ingress Buffer Threshold",
         SAI_ATTR_VAL_TYPE_U32
     },
     {
         SAI_BUFFER_PROFILE_ATTR_XON_TH, 
         false, true, true, true,
-        "XON ingress buffer threshold",
+        "XON ingress Buffer Threshold",
         SAI_ATTR_VAL_TYPE_U32
     },
 
@@ -268,6 +268,16 @@ sai_status_t stub_create_buffer_pool(
 
     sai_status_t status = 0;
 
+    // extract attributes
+
+    sai_buffer_pool_type_t type = 0;
+    sai_uint32_t size = 0;
+    sai_buffer_threshold_mode_t th_mode = SAI_BUFFER_THRESHOLD_MODE_DYNAMIC;
+
+    uint32_t type_idx = 0;
+    uint32_t size_idx = 0;
+    uint32_t th_mode_idx = 0;
+
     status = check_attribs_metadata(
         attr_count,
         attr_list,
@@ -278,6 +288,46 @@ sai_status_t stub_create_buffer_pool(
         printf("Attribute check failed, ec: 0x%016X\n", status);
         return status;
     }
+
+    const sai_attribute_value_t *attr_value;
+
+    status = find_attrib_in_list(
+        attr_count, attr_list,
+        SAI_BUFFER_POOL_ATTR_TYPE,
+        &attr_value,
+        &type_idx);
+    assert(status == SAI_STATUS_SUCCESS);
+    type = attr_value->s32;
+
+    status = find_attrib_in_list(
+        attr_count, attr_list,
+        SAI_BUFFER_POOL_ATTR_SIZE,
+        &attr_value,
+        &size_idx);
+    assert(status == SAI_STATUS_SUCCESS);
+    size = attr_value->u32;
+
+    status = find_attrib_in_list(
+        attr_count, attr_list,
+        SAI_BUFFER_POOL_ATTR_TH_MODE,
+        &attr_value,
+        &th_mode_idx);
+    if(status == SAI_STATUS_SUCCESS) {
+        th_mode = attr_value->s32;
+    }
+
+    // validate attributes
+    if ((type != SAI_BUFFER_POOL_INGRESS) && 
+        (type != SAI_BUFFER_POOL_EGRESS)) {
+        return SAI_STATUS_INVALID_ATTRIBUTE_0 + type_idx;
+    }
+
+    if ((th_mode != SAI_BUFFER_THRESHOLD_MODE_STATIC) && 
+        (th_mode != SAI_BUFFER_THRESHOLD_MODE_DYNAMIC)) {
+        return SAI_STATUS_INVALID_ATTRIBUTE_0 + th_mode_idx;
+    }
+
+    // create object
 
     uint32_t pool_idx = UINT32_MAX;
     
@@ -294,7 +344,11 @@ sai_status_t stub_create_buffer_pool(
 
     status = stub_create_object(SAI_OBJECT_TYPE_BUFFER_POOL, pool_idx, pool_id);
     if (status == SAI_STATUS_SUCCESS) {
-        DB.pools[pool_idx].taken = true;
+        buffer_pool_entry_t* entry = &DB.pools[pool_idx];
+        entry->taken = true;
+        entry->type = type;
+        entry->size = size;
+        entry->th_mode = th_mode;
     } else {
         printf("Cannot create Buffer Pool\n");
     }
