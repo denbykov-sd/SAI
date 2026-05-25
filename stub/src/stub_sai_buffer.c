@@ -45,11 +45,30 @@ static const sai_attribute_entry_t buffer_pool_attribs[] = {
       "", SAI_ATTR_VAL_TYPE_UNDETERMINED }
 };
 
-static sai_status_t stub_buffer_pool_get(
+static sai_status_t stub_buffer_pool_get_type(
     _In_ const sai_object_key_t *key,
     _Inout_ sai_attribute_value_t *value,
     _In_ uint32_t attr_index,
     _Inout_ vendor_cache_t *cache,
+    void *arg);
+
+static sai_status_t stub_buffer_pool_get_size(
+    _In_ const sai_object_key_t *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t attr_index,
+    _Inout_ vendor_cache_t *cache,
+    void *arg);
+
+static sai_status_t stub_buffer_pool_get_th_mode(
+    _In_ const sai_object_key_t *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t attr_index,
+    _Inout_ vendor_cache_t *cache,
+    void *arg);
+
+static sai_status_t stub_buffer_pool_set_size(
+    _In_ const sai_object_key_t *key,
+    _In_ const sai_attribute_value_t *value,
     void *arg);
 
 static const sai_vendor_attribute_entry_t buffer_pool_vendor_attribs[] = {
@@ -57,28 +76,28 @@ static const sai_vendor_attribute_entry_t buffer_pool_vendor_attribs[] = {
         SAI_BUFFER_POOL_ATTR_SHARED_SIZE,
       { false, false, false, false },
       { false, false, false, false },
-      stub_buffer_pool_get, (void*)SAI_BUFFER_POOL_ATTR_SHARED_SIZE,
+      NULL, NULL,
       NULL, NULL
     },
     {
         SAI_BUFFER_POOL_ATTR_TYPE,
       { true, true, false, true },
       { true, true, false, true },
-      stub_buffer_pool_get, (void*)SAI_BUFFER_POOL_ATTR_TYPE,
+      stub_buffer_pool_get_type, NULL,
       NULL, NULL
     },
     {
         SAI_BUFFER_POOL_ATTR_SIZE,
       { true, true, true, true },
       { true, true, true, true },
-      stub_buffer_pool_get, (void*)SAI_BUFFER_POOL_ATTR_SIZE,
-      NULL, NULL
+      stub_buffer_pool_get_size, NULL,
+      stub_buffer_pool_set_size, NULL
     },
     {
         SAI_BUFFER_POOL_ATTR_TH_MODE,
       { true, true, false, true },
       { true, true, false, true },
-      stub_buffer_pool_get, (void*)SAI_BUFFER_POOL_ATTR_TH_MODE,
+      stub_buffer_pool_get_th_mode, NULL,
       NULL, NULL
     },
 };
@@ -379,7 +398,7 @@ sai_status_t stub_remove_buffer_pool(
         return SAI_STATUS_INVALID_OBJECT_ID;
     }
 
-    entry->taken = false;
+    memset(entry, 0, sizeof(*entry));
 
     printf("Remove Buffer Pool: 0x%010lX\n", pool_id);
 
@@ -438,13 +457,70 @@ sai_status_t stub_get_buffer_pool_attribute(
         attr_list);
 }
 
-static sai_status_t stub_buffer_pool_get(
+static sai_status_t stub_buffer_pool_get_type(
     _In_ const sai_object_key_t *key,
     _Inout_ sai_attribute_value_t *value,
     _In_ uint32_t attr_index,
     _Inout_ vendor_cache_t *cache,
-    void *arg) {
-    return SAI_STATUS_NOT_IMPLEMENTED;
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+
+    buffer_pool_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_pool_entry(key->object_id, &entry));
+
+    value->s32 = entry->type;
+    return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t stub_buffer_pool_get_size(
+    _In_ const sai_object_key_t *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t attr_index,
+    _Inout_ vendor_cache_t *cache,
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+
+    buffer_pool_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_pool_entry(key->object_id, &entry));
+
+    value->u32 = entry->size;
+    return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t stub_buffer_pool_get_th_mode(
+    _In_ const sai_object_key_t *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t attr_index,
+    _Inout_ vendor_cache_t *cache,
+    void *arg)
+{
+    assert(key != NULL);
+    assert(value != NULL);
+
+    buffer_pool_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_pool_entry(key->object_id, &entry));
+
+    value->s32 = entry->th_mode;
+    return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t stub_buffer_pool_set_size(
+    _In_ const sai_object_key_t *key,
+    _In_ const sai_attribute_value_t *value,
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+
+    buffer_pool_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_pool_entry(key->object_id, &entry));
+
+    entry->size = value->u32;
+    return SAI_STATUS_SUCCESS;
 }
 
 sai_status_t stub_create_buffer_profile(
@@ -513,7 +589,7 @@ sai_status_t stub_remove_buffer_profile(
         return SAI_STATUS_INVALID_OBJECT_ID;
     }
 
-    entry->taken = false;
+    memset(entry, 0, sizeof(*entry));
 
     printf("Remove Buffer Profile: 0x%010lX\n", profile_id);
 
