@@ -85,7 +85,7 @@ typedef struct lag_db_s {
 
 static lag_db_t LAG_DB;
 
-void db_lag_unitialize() {
+void db_lag_uninitialize() {
     memset((void*)&LAG_DB, 0, sizeof(LAG_DB));
 }
 

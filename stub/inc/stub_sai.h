@@ -40,6 +40,7 @@ extern const sai_router_interface_api_t router_interface_api;
 extern const sai_vlan_api_t             vlan_api;
 extern const sai_hostif_api_t           host_interface_api;
 extern const sai_lag_api_t              lag_api;
+extern const sai_buffer_api_t           buffer_api;
 
 /*
  *  SAI operation type
@@ -235,7 +236,8 @@ sai_status_t stub_fill_vlanlist(sai_vlan_id_t *data, uint32_t count, sai_vlan_li
 
 void utils_log(const sai_log_level_t severity, const char *module_name, const char *p_str, ...);
 
-void db_lag_unitialize();
+void db_lag_uninitialize();
+void buffer_db_uninitialize();
 
 #define QUOTEME_(x) #x                        /* add "" to x */
 #define QUOTEME(x)  QUOTEME_(x)
