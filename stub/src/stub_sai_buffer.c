@@ -81,22 +81,22 @@ static const sai_vendor_attribute_entry_t buffer_pool_vendor_attribs[] = {
     },
     {
         SAI_BUFFER_POOL_ATTR_TYPE,
-      { true, true, false, true },
-      { true, true, false, true },
+      { true, false, false, true },
+      { true, false, false, true },
       stub_buffer_pool_get_type, NULL,
       NULL, NULL
     },
     {
         SAI_BUFFER_POOL_ATTR_SIZE,
-      { true, true, true, true },
-      { true, true, true, true },
+      { true, false, true, true },
+      { true, false, true, true },
       stub_buffer_pool_get_size, NULL,
       stub_buffer_pool_set_size, NULL
     },
     {
         SAI_BUFFER_POOL_ATTR_TH_MODE,
-      { true, true, false, true },
-      { true, true, false, true },
+      { true, false, false, true },
+      { true, false, false, true },
       stub_buffer_pool_get_th_mode, NULL,
       NULL, NULL
     },
@@ -144,54 +144,95 @@ static const sai_attribute_entry_t buffer_profile_attribs[] = {
       "", SAI_ATTR_VAL_TYPE_UNDETERMINED }
 };
 
-static sai_status_t stub_buffer_profile_get(
+static sai_status_t stub_buffer_profile_get_pool_id(
     _In_ const sai_object_key_t *key,
     _Inout_ sai_attribute_value_t *value,
     _In_ uint32_t attr_index,
     _Inout_ vendor_cache_t *cache,
     void *arg);
 
+static sai_status_t stub_buffer_profile_get_buffer_size(
+    _In_ const sai_object_key_t *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t attr_index,
+    _Inout_ vendor_cache_t *cache,
+    void *arg);
+
+static sai_status_t stub_buffer_profile_get_dynamic_th(
+    _In_ const sai_object_key_t *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t attr_index,
+    _Inout_ vendor_cache_t *cache,
+    void *arg);
+
+static sai_status_t stub_buffer_profile_get_static_th(
+    _In_ const sai_object_key_t *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t attr_index,
+    _Inout_ vendor_cache_t *cache,
+    void *arg);
+
+static sai_status_t stub_buffer_profile_set_pool_id(
+    _In_ const sai_object_key_t *key,
+    _In_ const sai_attribute_value_t *value,
+    void *arg);
+
+static sai_status_t stub_buffer_profile_set_buffer_size(
+    _In_ const sai_object_key_t *key,
+    _In_ const sai_attribute_value_t *value,
+    void *arg);
+
+static sai_status_t stub_buffer_profile_set_dynamic_th(
+    _In_ const sai_object_key_t *key,
+    _In_ const sai_attribute_value_t *value,
+    void *arg);
+
+static sai_status_t stub_buffer_profile_set_static_th(
+    _In_ const sai_object_key_t *key,
+    _In_ const sai_attribute_value_t *value,
+    void *arg);
+
 static const sai_vendor_attribute_entry_t buffer_profile_vendor_attribs[] = {
     {
         SAI_BUFFER_PROFILE_ATTR_POOL_ID,
-      { true, true, true, true },
-      { true, true, true, true },
-      stub_buffer_profile_get, (void*)SAI_BUFFER_PROFILE_ATTR_POOL_ID,
-      NULL, NULL
+      { true, false, true, true },
+      { true, false, true, true },
+      stub_buffer_profile_get_pool_id, NULL,
+      stub_buffer_profile_set_pool_id, NULL
     },
     {
         SAI_BUFFER_PROFILE_ATTR_BUFFER_SIZE,
-      { true, true, true, true },
-      { true, true, true, true },
-      stub_buffer_profile_get, (void*)SAI_BUFFER_PROFILE_ATTR_BUFFER_SIZE,
-      NULL, NULL
+      { true, false, true, true },
+      { true, false, true, true },
+      stub_buffer_profile_get_buffer_size, NULL,
+      stub_buffer_profile_set_buffer_size, NULL
     },
     {
         SAI_BUFFER_PROFILE_ATTR_SHARED_DYNAMIC_TH,
-      { false, true, true, true },
-      { false, true, true, true },
-      stub_buffer_profile_get, (void*)SAI_BUFFER_PROFILE_ATTR_SHARED_DYNAMIC_TH,
-      NULL, NULL
+      { true, false, true, true },
+      { true, false, true, true },
+      stub_buffer_profile_get_dynamic_th, NULL,
+      stub_buffer_profile_set_dynamic_th, NULL
     },
     {
         SAI_BUFFER_PROFILE_ATTR_SHARED_STATIC_TH,
-      { false, true, true, true },
-      { false, true, true, true },
-      stub_buffer_profile_get, (void*)SAI_BUFFER_PROFILE_ATTR_SHARED_STATIC_TH,
-      NULL, NULL
+      { true, false, true, true },
+      { true, false, true, true },
+      stub_buffer_profile_get_static_th, NULL,
+      stub_buffer_profile_set_static_th, NULL
     },
     {
         SAI_BUFFER_PROFILE_ATTR_XOFF_TH,
       { false, false, false, false },
       { false, false, false, false },
-      stub_buffer_profile_get, (void*)SAI_BUFFER_PROFILE_ATTR_XOFF_TH,
+      NULL, NULL,
       NULL, NULL
     },
     {
         SAI_BUFFER_PROFILE_ATTR_XON_TH,
       { false, false, false, false },
       { false, false, false, false },
-      stub_buffer_profile_get, (void*)SAI_BUFFER_PROFILE_ATTR_XON_TH,
+      NULL, NULL,
       NULL, NULL
     }
 };
@@ -207,8 +248,12 @@ typedef struct buffer_profile_entry_s {
     bool taken;
     sai_object_id_t pool_id;
     sai_uint32_t buffer_size;
+
     sai_int8_t dynamic_th;
+    bool dynamic_th_set;
+
     sai_uint32_t static_th;
+    bool static_th_set;
 } buffer_profile_entry_t;
 
 typedef struct buffer_db_s {
@@ -263,7 +308,7 @@ static sai_status_t get_buffer_profile_entry(
         &profile_idx)
     );
 
-    if (profile_idx >= BUFFER_POOL_COUNT) {
+    if (profile_idx >= BUFFER_PROFILE_COUNT) {
         printf("Bad profile(0x%010lX)\n", profile_id);
         return SAI_STATUS_INVALID_OBJECT_ID;
     }
@@ -285,7 +330,7 @@ sai_status_t stub_create_buffer_pool(
 {
     assert(pool_id != NULL);
 
-    sai_status_t status = 0;
+    sai_status_t status = SAI_STATUS_SUCCESS;
 
     // extract attributes
 
@@ -370,6 +415,7 @@ sai_status_t stub_create_buffer_pool(
         entry->th_mode = th_mode;
     } else {
         printf("Cannot create Buffer Pool\n");
+        return status;
     }
 
     char list_str[MAX_LIST_VALUE_STR_LEN];                                                       
@@ -387,7 +433,7 @@ sai_status_t stub_create_buffer_pool(
 }
 
 sai_status_t stub_remove_buffer_pool(
-    _In_ sai_object_id_t  pool_id)
+    _In_ sai_object_id_t pool_id)
 {
     buffer_pool_entry_t *entry = NULL;
     
@@ -398,8 +444,14 @@ sai_status_t stub_remove_buffer_pool(
         return SAI_STATUS_INVALID_OBJECT_ID;
     }
 
-    memset(entry, 0, sizeof(*entry));
+    for (int i = 0; i < BUFFER_PROFILE_COUNT; i++) {
+        buffer_profile_entry_t* profile = &DB.profiles[i];
+        if (profile->pool_id == pool_id) {
+            return SAI_STATUS_OBJECT_IN_USE;
+        }
+    }
 
+    memset(entry, 0, sizeof(*entry));
     printf("Remove Buffer Pool: 0x%010lX\n", pool_id);
 
     return SAI_STATUS_SUCCESS;
@@ -427,6 +479,11 @@ sai_status_t stub_set_buffer_pool_attribute(
     _In_ sai_object_id_t pool_id,
     _In_ const sai_attribute_t *attr)
 {
+    sai_object_type_t type = sai_object_type_query(pool_id);
+    if(type != SAI_OBJECT_TYPE_BUFFER_POOL) {
+        return SAI_STATUS_INVALID_OBJECT_TYPE;
+    }
+
     const sai_object_key_t key = { .object_id = pool_id };
     char                   key_str[MAX_KEY_STR_LEN];
 
@@ -444,6 +501,11 @@ sai_status_t stub_get_buffer_pool_attribute(
     _In_ uint32_t attr_count,
     _Inout_ sai_attribute_t *attr_list)
 {
+    sai_object_type_t type = sai_object_type_query(pool_id);
+    if(type != SAI_OBJECT_TYPE_BUFFER_POOL) {
+        return SAI_STATUS_INVALID_OBJECT_TYPE;
+    }
+
     const sai_object_key_t key = { .object_id = pool_id };
     char                   key_str[MAX_KEY_STR_LEN];
 
@@ -530,7 +592,19 @@ sai_status_t stub_create_buffer_profile(
 {
     assert(profile_id != NULL);
 
-    sai_status_t status = 0;
+    sai_status_t status = SAI_STATUS_SUCCESS;
+
+    // extract attributes
+
+    sai_object_id_t pool_id = 0;
+    sai_uint32_t size = 0;
+    sai_int8_t dynamic_th = 0;
+    sai_uint32_t static_th = 0;
+
+    uint32_t pool_id_idx = 0;
+    uint32_t size_idx = 0;
+    uint32_t dynamic_th_idx = UINT32_MAX;
+    uint32_t static_th_idx = UINT32_MAX;
 
     status = check_attribs_metadata(
         attr_count,
@@ -542,6 +616,65 @@ sai_status_t stub_create_buffer_profile(
         printf("Attribute check failed, ec: 0x%016X\n", status);
         return status;
     }
+
+    const sai_attribute_value_t *attr_value;
+
+    status = find_attrib_in_list(
+        attr_count, attr_list,
+        SAI_BUFFER_PROFILE_ATTR_POOL_ID,
+        &attr_value,
+        &pool_id_idx);
+    assert(status == SAI_STATUS_SUCCESS);
+    pool_id = attr_value->oid;
+
+    status = find_attrib_in_list(
+        attr_count, attr_list,
+        SAI_BUFFER_PROFILE_ATTR_BUFFER_SIZE,
+        &attr_value,
+        &size_idx);
+    assert(status == SAI_STATUS_SUCCESS);
+    size = attr_value->u32;
+
+    status = find_attrib_in_list(
+        attr_count, attr_list,
+        SAI_BUFFER_PROFILE_ATTR_SHARED_DYNAMIC_TH,
+        &attr_value,
+        &dynamic_th_idx);
+    if(status == SAI_STATUS_SUCCESS) {
+        dynamic_th = attr_value->s8;
+    }
+
+    status = find_attrib_in_list(
+        attr_count, attr_list,
+        SAI_BUFFER_PROFILE_ATTR_SHARED_STATIC_TH,
+        &attr_value,
+        &static_th_idx);
+    if(status == SAI_STATUS_SUCCESS) {
+        static_th = attr_value->u32;
+    }
+
+    // validate attributes
+
+    // I decided to ignore the:
+    // "Pool id = SAI_NULL_OBJECT_ID can be used when profile is not associated with specific
+    // *  pool, for example for global port buffer."
+    // as it seems to be out of the scope for the current task
+    buffer_pool_entry_t* buffer_pool_entry = NULL;
+
+    status = get_buffer_pool_entry(pool_id, &buffer_pool_entry);
+    if (status != SAI_STATUS_SUCCESS) {
+        return SAI_STATUS_INVALID_ATTR_VALUE_0 + pool_id_idx;
+    }
+
+    if (buffer_pool_entry->th_mode == SAI_BUFFER_THRESHOLD_MODE_DYNAMIC &&
+        dynamic_th_idx == UINT32_MAX) {
+        return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+    } else if (buffer_pool_entry->th_mode == SAI_BUFFER_THRESHOLD_MODE_STATIC &&
+        static_th_idx == UINT32_MAX) {
+        return SAI_STATUS_MANDATORY_ATTRIBUTE_MISSING;
+    }
+
+    // create object
 
     uint32_t profile_idx = UINT32_MAX;
     
@@ -556,11 +689,26 @@ sai_status_t stub_create_buffer_profile(
         return SAI_STATUS_TABLE_FULL;
     }
 
-    status = stub_create_object(SAI_OBJECT_TYPE_BUFFER_POOL, profile_idx, profile_id);
+    status = stub_create_object(
+        SAI_OBJECT_TYPE_BUFFER_PROFILE, profile_idx, profile_id);
     if (status == SAI_STATUS_SUCCESS) {
-        DB.profiles[profile_idx].taken = true;
+        buffer_profile_entry_t* entry = &DB.profiles[profile_idx];
+        entry->taken = true;
+        entry->pool_id = pool_id;
+        entry->buffer_size = size;
+
+        if (dynamic_th_idx != UINT32_MAX) {
+            entry->dynamic_th = dynamic_th;
+            entry->dynamic_th_set = true;
+        }
+
+        if (static_th_idx != UINT32_MAX) {
+            entry->static_th = static_th;
+            entry->static_th_set = true;
+        }        
     } else {
-        printf("Cannot create Buffer Pool\n");
+        printf("Cannot create Buffer Profile\n");
+        return status;
     }
 
     char list_str[MAX_LIST_VALUE_STR_LEN];                                                       
@@ -578,7 +726,7 @@ sai_status_t stub_create_buffer_profile(
 }
 
 sai_status_t stub_remove_buffer_profile(
-    _In_ sai_object_id_t  profile_id)
+    _In_ sai_object_id_t profile_id)
 {
     buffer_profile_entry_t *entry = NULL;
     
@@ -597,7 +745,7 @@ sai_status_t stub_remove_buffer_profile(
 }
 
 static void buffer_profile_key_to_str(
-    _In_ sai_object_id_t pool_id,
+    _In_ sai_object_id_t profile_id,
     _Out_ char *key_str)
 {
     assert(key_str != NULL);
@@ -605,12 +753,12 @@ static void buffer_profile_key_to_str(
     uint32_t id;
 
     if (SAI_STATUS_SUCCESS != stub_object_to_type(
-        pool_id,
-        SAI_OBJECT_TYPE_BUFFER_POOL,
+        profile_id,
+        SAI_OBJECT_TYPE_BUFFER_PROFILE,
         &id)) {
-        snprintf(key_str, MAX_KEY_STR_LEN, "invalid buffer pool");
+        snprintf(key_str, MAX_KEY_STR_LEN, "invalid buffer profile");
     } else {
-        snprintf(key_str, MAX_KEY_STR_LEN, "buffer pool %u", id);
+        snprintf(key_str, MAX_KEY_STR_LEN, "buffer profile %u", id);
     }
 }
 
@@ -618,6 +766,11 @@ sai_status_t stub_set_buffer_profile_attribute(
     _In_ sai_object_id_t profile_id,
     _In_ const sai_attribute_t *attr)
 {
+    sai_object_type_t type = sai_object_type_query(profile_id);
+    if(type != SAI_OBJECT_TYPE_BUFFER_PROFILE) {
+        return SAI_STATUS_INVALID_OBJECT_TYPE;
+    }
+
     const sai_object_key_t key = { .object_id = profile_id };
     char                   key_str[MAX_KEY_STR_LEN];
 
@@ -635,6 +788,11 @@ sai_status_t stub_get_buffer_profile_attribute(
     _In_ uint32_t attr_count,
     _Inout_ sai_attribute_t *attr_list)
 {
+    sai_object_type_t type = sai_object_type_query(profile_id);
+    if(type != SAI_OBJECT_TYPE_BUFFER_PROFILE) {
+        return SAI_STATUS_INVALID_OBJECT_TYPE;
+    }
+
     const sai_object_key_t key = { .object_id = profile_id };
     char                   key_str[MAX_KEY_STR_LEN];
 
@@ -648,13 +806,163 @@ sai_status_t stub_get_buffer_profile_attribute(
         attr_list);
 }
 
-static sai_status_t stub_buffer_profile_get(
+static sai_status_t stub_buffer_profile_get_pool_id(
     _In_ const sai_object_key_t *key,
     _Inout_ sai_attribute_value_t *value,
     _In_ uint32_t attr_index,
     _Inout_ vendor_cache_t *cache,
-    void *arg) {
-    return SAI_STATUS_NOT_IMPLEMENTED;
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+
+    buffer_profile_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_profile_entry(key->object_id, &entry));
+
+    value->oid = entry->pool_id;
+    return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t stub_buffer_profile_get_buffer_size(
+    _In_ const sai_object_key_t *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t attr_index,
+    _Inout_ vendor_cache_t *cache,
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+
+    buffer_profile_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_profile_entry(key->object_id, &entry));
+
+    value->u32 = entry->buffer_size;
+    return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t stub_buffer_profile_get_dynamic_th(
+    _In_ const sai_object_key_t *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t attr_index,
+    _Inout_ vendor_cache_t *cache,
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+
+    buffer_profile_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_profile_entry(key->object_id, &entry));
+
+    if (entry->dynamic_th_set) {
+        value->s8 = entry->dynamic_th;
+    } else {
+        return SAI_STATUS_UNINITIALIZED;
+    }
+
+    return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t stub_buffer_profile_get_static_th(
+    _In_ const sai_object_key_t *key,
+    _Inout_ sai_attribute_value_t *value,
+    _In_ uint32_t attr_index,
+    _Inout_ vendor_cache_t *cache,
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+
+    buffer_profile_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_profile_entry(key->object_id, &entry));
+
+    if (entry->static_th_set) {
+        value->u32 = entry->static_th;
+    } else {
+        return SAI_STATUS_UNINITIALIZED;
+    }
+
+    return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t stub_buffer_profile_set_pool_id(
+    _In_ const sai_object_key_t *key,
+    _In_ const sai_attribute_value_t *value,
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+    
+    buffer_profile_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_profile_entry(key->object_id, &entry));
+
+    // I decided to ignore the:
+    // "Pool id = SAI_NULL_OBJECT_ID can be used when profile is not associated with specific
+    // *  pool, for example for global port buffer."
+    // as it seems to be out of the scope for the current task
+
+    buffer_pool_entry_t* pool_entry = NULL;
+    sai_status_t status = get_buffer_pool_entry(value->oid, &pool_entry);
+    if (status != SAI_STATUS_SUCCESS) {
+        return SAI_STATUS_INVALID_ATTR_VALUE_0;
+    }
+
+    if (pool_entry->th_mode == SAI_BUFFER_THRESHOLD_MODE_DYNAMIC &&
+        entry->dynamic_th_set == false) {
+        return SAI_STATUS_INVALID_ATTR_VALUE_0;
+    } else if (pool_entry->th_mode == SAI_BUFFER_THRESHOLD_MODE_STATIC &&
+        entry->static_th_set == false) {
+        return SAI_STATUS_INVALID_ATTR_VALUE_0;
+    }
+
+    entry->pool_id = value->oid;
+    return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t stub_buffer_profile_set_buffer_size(
+    _In_ const sai_object_key_t *key,
+    _In_ const sai_attribute_value_t *value,
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+    
+    buffer_profile_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_profile_entry(key->object_id, &entry));
+
+    entry->buffer_size = value->u32;
+    return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t stub_buffer_profile_set_dynamic_th(
+    _In_ const sai_object_key_t *key,
+    _In_ const sai_attribute_value_t *value,
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+    
+    buffer_profile_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_profile_entry(key->object_id, &entry));
+
+    entry->dynamic_th = value->s8;
+    entry->dynamic_th_set = true;
+    return SAI_STATUS_SUCCESS;
+}
+
+static sai_status_t stub_buffer_profile_set_static_th(
+    _In_ const sai_object_key_t *key,
+    _In_ const sai_attribute_value_t *value,
+    void *arg) 
+{
+    assert(key != NULL);
+    assert(value != NULL);
+    
+    buffer_profile_entry_t *entry = NULL;
+    SAI_RETURN_ON_ERROR(get_buffer_profile_entry(key->object_id, &entry));
+
+    entry->static_th = value->u32;
+    entry->static_th_set = true;
+    return SAI_STATUS_SUCCESS;
 }
 
 sai_status_t stub_get_buffer_pool_stats(
